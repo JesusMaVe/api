@@ -21,6 +21,7 @@ echo "rotation: contraseña nueva sin borrar datos"
 check "make up aplica el .env rotado" make -s up ENV_FILE="$rotated"
 check_output "postgres: la contraseña nueva funciona" '^1$' pg_tcp "${POSTGRES_PASSWORD}-rotada"
 check_fails "postgres: la vieja ya no" pg_tcp "$POSTGRES_PASSWORD"
+check_output "api: sigue sana con la contraseña rotada" '"status":"ok"' curl -s "http://127.0.0.1:${API_HOST_PORT}/healthz"
 
 echo "rotation: vuelta al .env original"
 check "make up vuelve a aplicar el .env original" make -s up

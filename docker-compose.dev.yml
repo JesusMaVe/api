@@ -3,3 +3,7 @@ services:
   postgres:
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:?POSTGRES_HOST_PORT no definida}:5432"
+
+  api:
+    ports:
+      - "127.0.0.1:${API_HOST_PORT:?API_HOST_PORT no definida}:${API_PORT:?API_PORT no definida}"
