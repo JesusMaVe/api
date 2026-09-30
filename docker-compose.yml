@@ -39,6 +39,9 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    networks:
+      - default
+      - shared
     read_only: true
     cap_drop:
       - ALL
@@ -55,3 +58,8 @@ secrets:
 
 volumes:
   pgdata:
+
+networks:
+  shared:
+    name: ${SHARED_NETWORK:?SHARED_NETWORK no definida}
+    external: true
