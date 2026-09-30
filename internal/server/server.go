@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/JesusMaVe/api/internal/auth"
 	"github.com/JesusMaVe/api/internal/httpx"
+	"github.com/JesusMaVe/api/internal/items"
 )
 
 // healthzTimeout acota el ping a la base en /healthz (detalle interno, no configuración).
@@ -21,6 +23,9 @@ type Deps struct {
 	DB           Pinger
 	Log          *slog.Logger
 	MaxBodyBytes int64
+	Verifier     auth.TokenVerifier
+	Items        items.Repository
+	Limits       items.Limits
 }
 
 func New(d Deps) http.Handler {
@@ -35,6 +40,7 @@ func New(d Deps) http.Handler {
 		}
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
+	mux.Handle("/api/", auth.RequireBearer(d.Verifier, items.NewHandler(d.Items, d.Limits, d.Log)))
 	return httpx.Chain(mux,
 		httpx.RequestID,
 		httpx.Logging(d.Log),

@@ -29,4 +29,14 @@ check_output "puerto publicado solo en 127.0.0.1" '^127\.0\.0\.1:' "${DC[@]}" po
 check_output "migraciones aplicadas (tabla items)" '^items$' \
   "${DC[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select to_regclass('items')"
 
+echo "infra: items protegidos con Bearer"
+code() { curl -s -o /dev/null -w '%{http_code}' "$@"; } # gitleaks:allow (token inválido a propósito)
+check_output "GET /api/items sin token → 401" '^401$' code "$API/api/items"
+check_output "GET /api/items con Bearer inválido → 401" '^401$' \
+  code -H 'Authorization: Bearer no.es.valido' "$API/api/items" # gitleaks:allow
+check_output "POST /api/items sin token → 401" '^401$' \
+  code -X POST -H 'Content-Type: application/json' -d '{"title":"x"}' "$API/api/items"
+check_output "responde con CSP" '[Cc]ontent-[Ss]ecurity-[Pp]olicy' curl -sI "$API/healthz"
+check_no_output "los logs no contienen el Bearer" 'no\.es\.valido' "${DC[@]}" logs api
+
 summary

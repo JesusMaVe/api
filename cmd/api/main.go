@@ -14,8 +14,10 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/JesusMaVe/api/internal/auth"
 	"github.com/JesusMaVe/api/internal/config"
 	"github.com/JesusMaVe/api/internal/db"
+	"github.com/JesusMaVe/api/internal/items"
 	"github.com/JesusMaVe/api/internal/server"
 )
 
@@ -65,10 +67,25 @@ func run() error {
 	if err := db.Migrate(ctx, pool); err != nil {
 		return err
 	}
+	verifier, err := auth.NewVerifier(cfg.JWTPublicKeyPEM, cfg.JWTIssuer, cfg.JWTAudience)
+	if err != nil {
+		return err
+	}
 
 	srv := &http.Server{
-		Addr:              ":" + cfg.Port,
-		Handler:           server.New(server.Deps{DB: pool, Log: log, MaxBodyBytes: cfg.MaxBodyBytes}),
+		Addr: ":" + cfg.Port,
+		Handler: server.New(server.Deps{
+			DB:           pool,
+			Log:          log,
+			MaxBodyBytes: cfg.MaxBodyBytes,
+			Verifier:     verifier,
+			Items:        items.NewPGRepository(pool),
+			Limits: items.Limits{
+				TitleMax:       cfg.ItemTitleMax,
+				DescriptionMax: cfg.ItemDescriptionMax,
+				PageLimit:      cfg.ItemsPageLimit,
+			},
+		}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
