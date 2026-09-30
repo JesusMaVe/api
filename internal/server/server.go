@@ -18,8 +18,9 @@ type Pinger interface {
 }
 
 type Deps struct {
-	DB  Pinger
-	Log *slog.Logger
+	DB           Pinger
+	Log          *slog.Logger
+	MaxBodyBytes int64
 }
 
 func New(d Deps) http.Handler {
@@ -34,5 +35,11 @@ func New(d Deps) http.Handler {
 		}
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	return mux
+	return httpx.Chain(mux,
+		httpx.RequestID,
+		httpx.Logging(d.Log),
+		httpx.Recover(d.Log),
+		httpx.SecurityHeaders,
+		httpx.MaxBytes(d.MaxBodyBytes),
+	)
 }

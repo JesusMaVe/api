@@ -36,3 +36,10 @@ func TestHealthzDBDown(t *testing.T) {
 		t.Fatalf("se esperaba 503 genérico, got %d %s", rec.Code, rec.Body)
 	}
 }
+
+func TestSecurityHeadersOnEveryResponse(t *testing.T) {
+	rec := get(t, Deps{DB: fakeDB{}, Log: discard(), MaxBodyBytes: 1024}, "/no-existe")
+	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("X-Request-Id") == "" {
+		t.Fatalf("faltan headers: %v", rec.Header())
+	}
+}

@@ -68,7 +68,7 @@ func run() error {
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.Port,
-		Handler:           server.New(server.Deps{DB: pool, Log: log}),
+		Handler:           server.New(server.Deps{DB: pool, Log: log, MaxBodyBytes: cfg.MaxBodyBytes}),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       10 * time.Second,
 		WriteTimeout:      10 * time.Second,
