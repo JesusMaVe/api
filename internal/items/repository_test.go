@@ -2,6 +2,7 @@ package items
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/JesusMaVe/api/internal/db"
@@ -41,5 +42,30 @@ func TestPGRepository(t *testing.T) {
 	}
 	if len(got) != 2 || got[0].ID != third.ID || got[1].ID != second.ID {
 		t.Fatalf("debe devolver los 2 más recientes primero: %+v", got)
+	}
+
+	// Update y Delete: solo el dueño; otro usuario recibe ErrForbidden y un id inexistente ErrNotFound.
+	edited, err := repo.Update(ctx, first.ID, "alice", Changes{Title: "Zelda TOTK", Description: "secuela"})
+	if err != nil || edited.Title != "Zelda TOTK" || edited.Description != "secuela" || edited.CreatedBy != "alice" || !edited.CreatedAt.Equal(first.CreatedAt) {
+		t.Fatalf("Update: %+v %v", edited, err)
+	}
+	if _, err := repo.Update(ctx, first.ID, "bob", Changes{Title: "hackeado"}); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Update de otro usuario: %v", err)
+	}
+	if _, err := repo.Update(ctx, 999999, "alice", Changes{Title: "x"}); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Update inexistente: %v", err)
+	}
+	if err := repo.Delete(ctx, second.ID, "alice"); !errors.Is(err, ErrForbidden) {
+		t.Fatalf("Delete de otro usuario: %v", err)
+	}
+	if err := repo.Delete(ctx, first.ID, "alice"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if err := repo.Delete(ctx, first.ID, "alice"); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("Delete repetido: %v", err)
+	}
+	left, _ := repo.List(ctx, 10)
+	if len(left) != 2 || left[0].ID != third.ID || left[1].ID != second.ID {
+		t.Fatalf("tras borrar quedan los otros dos, y el de bob intacto: %+v", left)
 	}
 }
