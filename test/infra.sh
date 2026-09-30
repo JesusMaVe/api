@@ -29,6 +29,11 @@ check_output "puerto publicado solo en 127.0.0.1" '^127\.0\.0\.1:' "${DC[@]}" po
 # shellcheck disable=SC2016  # el $k es de la plantilla Go de docker inspect
 check_output "api está en la red compartida" "$SHARED_NETWORK" \
   docker inspect -f '{{range $k, $v := .NetworkSettings.Networks}}{{$k}} {{end}}' "$("${DC[@]}" ps -q api)"
+check_output "la api usa el rol de aplicación, sin superusuario" "^f\$" \
+  "${DC[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc \
+  "select rolsuper from pg_stat_activity a join pg_roles r on r.rolname = a.usename where a.application_name = '' and a.usename = '$POSTGRES_APP_USER' limit 1"
+check_output "la tabla items es del rol de aplicación" "^${POSTGRES_APP_USER}\$" \
+  "${DC[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select tableowner from pg_tables where tablename = 'items'"
 check_output "migraciones aplicadas (tabla items)" '^items$' \
   "${DC[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select to_regclass('items')"
 

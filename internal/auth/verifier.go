@@ -58,5 +58,9 @@ func (v *Verifier) Verify(token string) (User, error) {
 	if c.Subject == "" {
 		return User{}, fmt.Errorf("%w: sin sub", ErrInvalidToken)
 	}
+	// WithIssuedAt solo valida iat si viene; la spec lo exige siempre.
+	if c.IssuedAt == nil {
+		return User{}, fmt.Errorf("%w: sin iat", ErrInvalidToken)
+	}
 	return User{Subject: c.Subject, Name: c.Name, Email: c.Email}, nil
 }

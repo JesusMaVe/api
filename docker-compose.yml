@@ -7,8 +7,12 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB no definida}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER no definida}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      # Rol de la aplicación (sin superusuario): lo crea y rota el entrypoint en cada arranque.
+      POSTGRES_APP_USER: ${POSTGRES_APP_USER:?POSTGRES_APP_USER no definida}
+      POSTGRES_APP_PASSWORD_FILE: /run/secrets/postgres_app_password
     secrets:
       - postgres_password
+      - postgres_app_password
     volumes:
       - pgdata:/var/lib/postgresql
     security_opt:
@@ -23,8 +27,8 @@ services:
       POSTGRES_HOST: postgres
       POSTGRES_PORT: "5432"
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB no definida}
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER no definida}
-      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
+      POSTGRES_USER: ${POSTGRES_APP_USER:?POSTGRES_APP_USER no definida}
+      POSTGRES_PASSWORD_FILE: /run/secrets/postgres_app_password
       POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:?POSTGRES_SSLMODE no definida}
       JWT_PUBLIC_KEY_FILE: /run/secrets/jwt_public_key
       JWT_ISSUER: ${JWT_ISSUER:?JWT_ISSUER no definida}
@@ -34,7 +38,7 @@ services:
       ITEM_DESCRIPTION_MAX: ${ITEM_DESCRIPTION_MAX:?ITEM_DESCRIPTION_MAX no definida}
       ITEMS_PAGE_LIMIT: ${ITEMS_PAGE_LIMIT:?ITEMS_PAGE_LIMIT no definida}
     secrets:
-      - postgres_password
+      - postgres_app_password
       - jwt_public_key
     depends_on:
       postgres:
@@ -53,6 +57,8 @@ services:
 secrets:
   postgres_password:
     file: ./secrets/postgres_password
+  postgres_app_password:
+    file: ./secrets/postgres_app_password
   jwt_public_key:
     file: ./secrets/jwt_public_key
 
