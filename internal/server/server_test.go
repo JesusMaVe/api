@@ -8,6 +8,10 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
+
+	"github.com/JesusMaVe/api/internal/auth"
+	"github.com/JesusMaVe/api/internal/items"
 )
 
 type fakeDB struct{ err error }
@@ -41,5 +45,35 @@ func TestSecurityHeadersOnEveryResponse(t *testing.T) {
 	rec := get(t, Deps{DB: fakeDB{}, Log: discard(), MaxBodyBytes: 1024}, "/no-existe")
 	if rec.Header().Get("X-Content-Type-Options") != "nosniff" || rec.Header().Get("X-Request-Id") == "" {
 		t.Fatalf("faltan headers: %v", rec.Header())
+	}
+}
+
+type okVerifier struct{}
+
+func (okVerifier) Verify(string) (auth.User, error) { return auth.User{Subject: "alice"}, nil }
+
+// Una base que acepta la conexión pero no responde no debe colgar /api/items.
+type hangingRepo struct{}
+
+func (hangingRepo) List(ctx context.Context, _ int) ([]items.Item, error) {
+	<-ctx.Done()
+	return nil, ctx.Err()
+}
+
+func (hangingRepo) Create(ctx context.Context, _ items.NewItem) (items.Item, error) {
+	<-ctx.Done()
+	return items.Item{}, ctx.Err()
+}
+
+func TestItemsDoNotHangWhenDBHangs(t *testing.T) {
+	h := New(Deps{DB: fakeDB{}, Log: discard(), MaxBodyBytes: 1024, Verifier: okVerifier{}, Items: hangingRepo{},
+		Limits: items.Limits{TitleMax: 10, DescriptionMax: 10, PageLimit: 10}})
+	req := httptest.NewRequest("GET", "/api/items", nil)
+	req.Header.Set("Authorization", "Bearer x")
+	rec := httptest.NewRecorder()
+	start := time.Now()
+	h.ServeHTTP(rec, req)
+	if rec.Code != 500 || time.Since(start) > itemsTimeout+time.Second {
+		t.Fatalf("got %d en %v; se esperaba 500 genérico dentro de %v", rec.Code, time.Since(start), itemsTimeout)
 	}
 }

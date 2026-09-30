@@ -45,7 +45,7 @@ func Load(getenv func(string) string) (Config, error) {
 			User:     url.UserPassword(pgUser, string(pgPassword)),
 			Host:     net.JoinHostPort(pgHost, pgPort),
 			Path:     "/" + pgDB,
-			RawQuery: url.Values{"sslmode": {pgSSLMode}}.Encode(),
+			RawQuery: url.Values{"sslmode": {pgSSLMode}, "connect_timeout": {"5"}}.Encode(),
 		}).String(),
 		JWTPublicKeyPEM:    r.file("JWT_PUBLIC_KEY_FILE"),
 		JWTIssuer:          r.str("JWT_ISSUER"),
