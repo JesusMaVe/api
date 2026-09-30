@@ -65,6 +65,16 @@ func (hangingRepo) Create(ctx context.Context, _ items.NewItem) (items.Item, err
 	return items.Item{}, ctx.Err()
 }
 
+func (hangingRepo) Update(ctx context.Context, _ int64, _ string, _ items.Changes) (items.Item, error) {
+	<-ctx.Done()
+	return items.Item{}, ctx.Err()
+}
+
+func (hangingRepo) Delete(ctx context.Context, _ int64, _ string) error {
+	<-ctx.Done()
+	return ctx.Err()
+}
+
 func TestItemsDoNotHangWhenDBHangs(t *testing.T) {
 	h := New(Deps{DB: fakeDB{}, Log: discard(), MaxBodyBytes: 1024, Verifier: okVerifier{}, Items: hangingRepo{},
 		Limits: items.Limits{TitleMax: 10, DescriptionMax: 10, PageLimit: 10}})

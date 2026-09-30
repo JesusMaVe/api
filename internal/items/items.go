@@ -3,6 +3,7 @@ package items
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -23,6 +24,19 @@ type NewItem struct {
 	CreatedBy   string
 }
 
+// Changes son los campos editables de un item (el dueño y la fecha no cambian).
+type Changes struct {
+	Title       string
+	Description string
+}
+
+// ErrNotFound: el item no existe. ErrForbidden: existe pero es de otro usuario (solo el dueño
+// puede editarlo o borrarlo).
+var (
+	ErrNotFound  = errors.New("items: no existe")
+	ErrForbidden = errors.New("items: de otro usuario")
+)
+
 // Limits salen de la config (ITEM_TITLE_MAX, ITEM_DESCRIPTION_MAX, ITEMS_PAGE_LIMIT).
 type Limits struct {
 	TitleMax       int
@@ -33,6 +47,8 @@ type Limits struct {
 type Repository interface {
 	List(ctx context.Context, limit int) ([]Item, error)
 	Create(ctx context.Context, in NewItem) (Item, error)
+	Update(ctx context.Context, id int64, owner string, c Changes) (Item, error)
+	Delete(ctx context.Context, id int64, owner string) error
 }
 
 // Validate devuelve un mensaje por campo inválido, o nil. Los límites cuentan caracteres, no bytes.

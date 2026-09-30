@@ -1,6 +1,6 @@
 # api
 
-API de items del dashboard. Recibe el JWT de **auth-svc** ([`auth`](https://github.com/JesusMaVe/auth)) como `Authorization: Bearer` y lo valida en cada `GET`/`POST /api/items`. El frontend vive en [`frontend`](https://github.com/JesusMaVe/frontend).
+API de items del dashboard. Recibe el JWT de **auth-svc** ([`auth`](https://github.com/JesusMaVe/auth)) como `Authorization: Bearer` y lo valida en cada request a `/api/items`. El frontend vive en [`frontend`](https://github.com/JesusMaVe/frontend).
 
 Diseño: [spec en el repo auth](https://github.com/JesusMaVe/auth/blob/main/docs/superpowers/specs/2026-09-24-auth-dashboard-design.md)
 
@@ -39,6 +39,8 @@ Todos los de `/api/*` exigen `Authorization: Bearer <jwt de auth-svc>`; sin toke
 | GET | `/healthz` | `200 {"status":"ok"}` / `503` si la base no responde |
 | GET | `/api/items` | `200 {"items":[{id,title,description,created_by,created_at}]}` (más recientes primero, hasta `ITEMS_PAGE_LIMIT`) |
 | POST | `/api/items` | Body `{"title","description"}` → `201` con el item; `created_by` sale del `sub` del token. `400` validación, `413` cuerpo demasiado grande |
+| PUT | `/api/items/{id}` | Body `{"title","description"}` → `200` con el item editado. Solo el dueño (`created_by` = `sub`): `403` si es de otro, `404` si no existe, `400` validación |
+| DELETE | `/api/items/{id}` | `204`. Solo el dueño: `403` si es de otro, `404` si no existe |
 
 ```bash
 TOKEN=$(curl -s -X POST 127.0.0.1:8081/token -H 'Content-Type: application/json' \

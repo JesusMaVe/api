@@ -19,6 +19,8 @@ type fakeRepo struct {
 	err       error
 	created   NewItem
 	listLimit int
+	updated   updateCall
+	deleted   deleteCall
 }
 
 func (f *fakeRepo) List(_ context.Context, limit int) ([]Item, error) {
@@ -132,5 +134,124 @@ func TestRepoErrorIsGeneric500(t *testing.T) {
 func TestWithoutUserIs401(t *testing.T) {
 	if rec := do(t, &fakeRepo{}, &bytes.Buffer{}, "GET", "", false); rec.Code != 401 {
 		t.Fatalf("sin usuario en el contexto: %d", rec.Code)
+	}
+}
+
+func (f *fakeRepo) Update(_ context.Context, id int64, owner string, c Changes) (Item, error) {
+	f.updated = updateCall{id, owner, c}
+	if f.err != nil {
+		return Item{}, f.err
+	}
+	return Item{ID: id, Title: c.Title, Description: c.Description, CreatedBy: owner, CreatedAt: time.Unix(0, 0).UTC()}, nil
+}
+
+func (f *fakeRepo) Delete(_ context.Context, id int64, owner string) error {
+	f.deleted = deleteCall{id, owner}
+	return f.err
+}
+
+type updateCall struct {
+	id    int64
+	owner string
+	c     Changes
+}
+
+type deleteCall struct {
+	id    int64
+	owner string
+}
+
+func doAt(t *testing.T, repo *fakeRepo, logs *bytes.Buffer, method, path, body string) *httptest.ResponseRecorder {
+	t.Helper()
+	h := NewHandler(repo, handlerLimits, slog.New(slog.NewJSONHandler(logs, nil)))
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req = req.WithContext(auth.WithUser(req.Context(), auth.User{Subject: "alice"}))
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	return rec
+}
+
+func TestUpdate(t *testing.T) {
+	repo, logs := &fakeRepo{}, &bytes.Buffer{}
+	rec := doAt(t, repo, logs, "PUT", "/api/items/7", `{"title":"  Zelda TOTK ","description":" secuela "}`)
+	if rec.Code != 200 || !strings.Contains(rec.Body.String(), `"title":"Zelda TOTK"`) {
+		t.Fatalf("got %d %s", rec.Code, rec.Body)
+	}
+	want := updateCall{7, "alice", Changes{Title: "Zelda TOTK", Description: "secuela"}}
+	if repo.updated != want {
+		t.Fatalf("el repo recibió %+v, quería %+v (dueño = sub del token)", repo.updated, want)
+	}
+	if !strings.Contains(logs.String(), `"user":"alice"`) || strings.Contains(logs.String(), "Zelda") {
+		t.Fatalf("el log de auditoría lleva usuario e id, no el contenido: %s", logs)
+	}
+}
+
+func TestDelete(t *testing.T) {
+	repo := &fakeRepo{}
+	rec := doAt(t, repo, &bytes.Buffer{}, "DELETE", "/api/items/7", "")
+	if rec.Code != 204 || rec.Body.Len() != 0 {
+		t.Fatalf("got %d %q", rec.Code, rec.Body)
+	}
+	if repo.deleted != (deleteCall{7, "alice"}) {
+		t.Fatalf("el repo recibió %+v", repo.deleted)
+	}
+}
+
+func TestUpdateRejects(t *testing.T) {
+	cases := []struct {
+		name, path, body string
+		status           int
+		want             string
+	}{
+		{"id no numérico", "/api/items/abc", `{"title":"x"}`, 404, `"not found"`},
+		{"id cero", "/api/items/0", `{"title":"x"}`, 404, `"not found"`},
+		{"campo desconocido", "/api/items/7", `{"title":"x","created_by":"bob"}`, 400, `"invalid request"`},
+		{"título vacío", "/api/items/7", `{"title":"  "}`, 400, `"fields":{"title"`},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &fakeRepo{}
+			rec := doAt(t, repo, &bytes.Buffer{}, "PUT", tc.path, tc.body)
+			if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.want) {
+				t.Fatalf("got %d %s", rec.Code, rec.Body)
+			}
+			if repo.updated != (updateCall{}) {
+				t.Fatal("no debe llegar al repositorio")
+			}
+		})
+	}
+}
+
+func TestUpdateDeleteRepoErrors(t *testing.T) {
+	cases := []struct {
+		name   string
+		err    error
+		status int
+		want   string
+	}{
+		{"no existe", ErrNotFound, 404, `"not found"`},
+		{"de otro usuario", ErrForbidden, 403, `"forbidden"`},
+		{"falla la base", errors.New("conn refused: detalle interno"), 500, `"internal error"`},
+	}
+	for _, tc := range cases {
+		for _, method := range []string{"PUT", "DELETE"} {
+			t.Run(tc.name+"/"+method, func(t *testing.T) {
+				rec := doAt(t, &fakeRepo{err: tc.err}, &bytes.Buffer{}, method, "/api/items/7", `{"title":"x"}`)
+				if rec.Code != tc.status || !strings.Contains(rec.Body.String(), tc.want) || strings.Contains(rec.Body.String(), "detalle") {
+					t.Fatalf("got %d %s", rec.Code, rec.Body)
+				}
+			})
+		}
+	}
+}
+
+func TestUpdateDeleteWithoutUserIs401(t *testing.T) {
+	h := NewHandler(&fakeRepo{}, handlerLimits, slog.New(slog.NewJSONHandler(&bytes.Buffer{}, nil)))
+	for _, method := range []string{"PUT", "DELETE"} {
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, httptest.NewRequest(method, "/api/items/7", strings.NewReader(`{"title":"x"}`)))
+		if rec.Code != 401 {
+			t.Fatalf("%s sin usuario = %d", method, rec.Code)
+		}
 	}
 }
