@@ -61,6 +61,7 @@ func TestVerifyRejects(t *testing.T) {
 		"iss distinto":         authtest.Sign(t, keys.Private, with("iss", "otro")),
 		"aud distinta":         authtest.Sign(t, keys.Private, with("aud", "otra-api")),
 		"sin sub":              authtest.Sign(t, keys.Private, with("sub", nil)),
+		"sin iat":              authtest.Sign(t, keys.Private, with("iat", nil)),
 		"malformado":           "no.es.un-jwt",
 		"vacío":                "",
 	}
