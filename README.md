@@ -11,13 +11,24 @@ Diseño: [spec en el repo auth](https://github.com/JesusMaVe/auth/blob/main/docs
 
 ## Primeros pasos
 
+Levanta primero `auth` (`make up` en `../auth`), porque de ahí sale la clave pública del JWT.
+
 ```bash
 make env     # crea .env con secretos aleatorios (una sola vez)
-make up      # postgres (127.0.0.1:5433); importa la clave pública desde ../auth
+make up      # postgres (127.0.0.1:5433) + api (127.0.0.1:8082); importa la clave pública desde ../auth
 make test    # corre todos los tests
+make help    # lista los comandos disponibles
 ```
 
-Sin `../auth`, `make up` genera un par de claves de **desarrollo**: la API arranca, pero los tokens reales de auth-svc no validan.
+- Sin `../auth`, `make up` genera un par de claves de **desarrollo**: la API arranca, pero los tokens reales de auth-svc no validan.
+- Si `auth` rota su clave, basta con volver a correr `make up` aquí: detecta el cambio y recrea la API.
+- El primer `make up` (de cualquiera de los 3 repos) crea la red Docker compartida `practica` (172.30.0.0/24); por ella la imagen nginx del frontend llega a la API.
+
+## Postgres
+
+- La API se conecta con el rol `POSTGRES_APP_USER` (`api_app`), **sin superusuario**; `POSTGRES_USER` solo administra. El entrypoint de la imagen crea ese rol y aplica sus contraseñas en cada arranque.
+- Rotar contraseñas sin perder datos: cambia los `*_PASSWORD` de `.env` y corre `make up`.
+- `make clean` detiene todo y **borra** los datos.
 
 ## Endpoints
 
