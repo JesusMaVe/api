@@ -1,0 +1,5 @@
+# Solo desarrollo: publica los puertos en localhost.
+services:
+  postgres:
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:?POSTGRES_HOST_PORT no definida}:5432"
