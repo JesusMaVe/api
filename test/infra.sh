@@ -22,4 +22,11 @@ check_output "autentica por TCP con la contraseña del secreto" '^1$' pg_tcp "$P
 check_fails  "rechaza por TCP una contraseña errónea" pg_tcp contraseña-incorrecta
 check_output "puerto publicado solo en 127.0.0.1" '^127\.0\.0\.1:' "${DC[@]}" port postgres 5432
 
+echo "infra: api"
+API="http://127.0.0.1:${API_HOST_PORT}"
+check_output "healthz responde ok" '"status":"ok"' curl -s "$API/healthz"
+check_output "puerto publicado solo en 127.0.0.1" '^127\.0\.0\.1:' "${DC[@]}" port api "$API_PORT"
+check_output "migraciones aplicadas (tabla items)" '^items$' \
+  "${DC[@]}" exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -tAc "select to_regclass('items')"
+
 summary
