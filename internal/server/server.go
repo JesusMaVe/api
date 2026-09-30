@@ -15,6 +15,10 @@ import (
 // healthzTimeout acota el ping a la base en /healthz (detalle interno, no configuración).
 const healthzTimeout = 2 * time.Second
 
+// itemsTimeout acota cada petición a /api/* (menor que el WriteTimeout del servidor): una base que
+// acepta la conexión pero no responde da un 500 genérico en vez de colgar al cliente.
+const itemsTimeout = 5 * time.Second
+
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
@@ -40,7 +44,12 @@ func New(d Deps) http.Handler {
 		}
 		httpx.JSON(w, http.StatusOK, map[string]string{"status": "ok"})
 	})
-	mux.Handle("/api/", auth.RequireBearer(d.Verifier, items.NewHandler(d.Items, d.Limits, d.Log)))
+	api := auth.RequireBearer(d.Verifier, items.NewHandler(d.Items, d.Limits, d.Log))
+	mux.Handle("/api/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		ctx, cancel := context.WithTimeout(r.Context(), itemsTimeout)
+		defer cancel()
+		api.ServeHTTP(w, r.WithContext(ctx))
+	}))
 	return httpx.Chain(mux,
 		httpx.RequestID,
 		httpx.Logging(d.Log),
