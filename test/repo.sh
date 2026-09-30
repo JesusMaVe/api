@@ -98,4 +98,14 @@ check_output "sin repo auth genera un par de desarrollo" '^jwt_public_key$' \
 check "el par de desarrollo es Ed25519" \
   sh -c "openssl pkey -pubin -in '$tmp/dev-secrets/jwt_public_key' -noout -text | grep -q ED25519"
 
+echo "repo: red compartida"
+net="api-test-net-$$"
+check "crea la red si no existe" scripts/ensure-network.sh "$net" 172.31.250.0/24
+check_output "con la subnet pedida" '172\.31\.250\.0/24' \
+  docker network inspect -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}' "$net"
+check "si ya existe con la misma subnet no hace nada" scripts/ensure-network.sh "$net" 172.31.250.0/24
+check_output "si existe con otra subnet falla y lo explica" "existe con la subnet 172.31.250.0/24" \
+  scripts/ensure-network.sh "$net" 172.31.251.0/24
+docker network rm "$net" >/dev/null 2>&1
+
 summary
